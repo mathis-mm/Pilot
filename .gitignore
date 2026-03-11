@@ -40,7 +40,6 @@ local.properties
 /captures
 
 # Keystore files
-*.jks
 *.keystore
 
 # Google Services
