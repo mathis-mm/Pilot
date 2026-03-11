@@ -38,7 +38,8 @@ fun DashboardScreen(
     onNavigateToTasks: () -> Unit,
     onNavigateToAgenda: () -> Unit,
     onNavigateToNotes: () -> Unit,
-    onNavigateToHabits: () -> Unit
+    onNavigateToHabits: () -> Unit,
+    onNavigateToAbout: () -> Unit = {}
 ) {
     val dateFormat = SimpleDateFormat("EEEE d MMMM yyyy", Locale.FRANCE)
     val today = dateFormat.format(Date())
@@ -49,19 +50,29 @@ fun DashboardScreen(
             .background(Color.Black),
         contentPadding = PaddingValues(bottom = 100.dp)
     ) {
-        // Header - date only, clean
+        // Header - date + about icon
         item {
-            Column(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp)
-                    .padding(top = 48.dp, bottom = 8.dp)
+                    .padding(top = 48.dp, bottom = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = today.replaceFirstChar { it.uppercase() },
                     style = MaterialTheme.typography.bodyMedium,
                     color = Color.White.copy(alpha = 0.4f)
                 )
+                IconButton(onClick = onNavigateToAbout, modifier = Modifier.size(32.dp)) {
+                    Icon(
+                        Icons.Outlined.Info,
+                        contentDescription = "A propos",
+                        tint = Color.White.copy(alpha = 0.4f),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
         }
 

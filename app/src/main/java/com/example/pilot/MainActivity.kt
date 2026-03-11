@@ -36,7 +36,12 @@ import com.example.pilot.update.AppUpdate
 import com.example.pilot.update.UpdateChecker
 import com.example.pilot.update.UpdateDialog
 import com.example.pilot.update.UpdateManager
+import com.example.pilot.update.UpdateWorker
 import com.example.pilot.util.PermissionHelper
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
+import java.util.concurrent.TimeUnit
 
 private enum class AppState { SPLASH, PERMISSIONS, MAIN }
 
@@ -51,6 +56,15 @@ class MainActivity : ComponentActivity() {
         )
 
         NotificationHelper.createNotificationChannels(this)
+
+        // Schedule background update checks every 6 hours
+        val updateWork = PeriodicWorkRequestBuilder<UpdateWorker>(6, TimeUnit.HOURS)
+            .build()
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            "update_check",
+            ExistingPeriodicWorkPolicy.KEEP,
+            updateWork
+        )
 
         var keepSplash = true
         splash.setKeepOnScreenCondition { keepSplash }
@@ -187,8 +201,13 @@ fun PilotApp() {
                     onNavigateToTasks = { navController.navigateBottomNav(Screen.Tasks.route) },
                     onNavigateToAgenda = { navController.navigateBottomNav(Screen.Agenda.route) },
                     onNavigateToNotes = { navController.navigateBottomNav(Screen.Notes.route) },
-                    onNavigateToHabits = { navController.navigateBottomNav(Screen.Habits.route) }
+                    onNavigateToHabits = { navController.navigateBottomNav(Screen.Habits.route) },
+                    onNavigateToAbout = { navController.navigate("about") }
                 )
+            }
+
+            composable("about") {
+                AboutScreen(onBack = { navController.popBackStack() })
             }
 
             composable(Screen.Tasks.route) {
