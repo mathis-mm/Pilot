@@ -50,7 +50,7 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
         )
 
-        NotificationHelper.createNotificationChannel(this)
+        NotificationHelper.createNotificationChannels(this)
 
         var keepSplash = true
         splash.setKeepOnScreenCondition { keepSplash }
@@ -111,7 +111,11 @@ fun PilotApp() {
     // Auto-update check
     var availableUpdate by remember { mutableStateOf<AppUpdate?>(null) }
     LaunchedEffect(Unit) {
-        availableUpdate = UpdateChecker.checkForUpdate(context)
+        val update = UpdateChecker.checkForUpdate(context)
+        if (update != null) {
+            NotificationHelper.showUpdateNotification(context, update.versionName)
+        }
+        availableUpdate = update
     }
 
     val taskViewModel: TaskViewModel = viewModel()
