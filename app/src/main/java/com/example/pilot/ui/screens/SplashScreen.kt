@@ -18,6 +18,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.pilot.R
+import com.example.pilot.ui.theme.Primary
 import kotlinx.coroutines.delay
 
 @Composable
@@ -26,18 +27,27 @@ fun SplashScreen(onSplashFinished: () -> Unit) {
 
     val alphaAnim by animateFloatAsState(
         targetValue = if (startAnimation) 1f else 0f,
-        animationSpec = tween(durationMillis = 1000, easing = FastOutSlowInEasing),
+        animationSpec = tween(durationMillis = 800, easing = FastOutSlowInEasing),
         label = "splash_alpha"
     )
     val scaleAnim by animateFloatAsState(
         targetValue = if (startAnimation) 1f else 0.85f,
-        animationSpec = tween(durationMillis = 1000, easing = FastOutSlowInEasing),
+        animationSpec = tween(durationMillis = 800, easing = FastOutSlowInEasing),
         label = "splash_scale"
     )
 
+    // Typewriter effect
+    val fullText = "Votre assistant personnel"
+    var displayedText by remember { mutableStateOf("") }
+
     LaunchedEffect(Unit) {
         startAnimation = true
-        delay(2000)
+        delay(600)
+        for (i in fullText.indices) {
+            displayedText = fullText.substring(0, i + 1)
+            delay(50)
+        }
+        delay(800)
         onSplashFinished()
     }
 
@@ -66,11 +76,29 @@ fun SplashScreen(onSplashFinished: () -> Unit) {
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = "Votre assistant personnel",
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(alpha = 0.5f)
-            )
+            Row {
+                Text(
+                    text = displayedText,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.6f)
+                )
+                // Blinking cursor
+                val cursorVisible = displayedText.length < fullText.length
+                if (cursorVisible) {
+                    var showCursor by remember { mutableStateOf(true) }
+                    LaunchedEffect(Unit) {
+                        while (true) {
+                            delay(400)
+                            showCursor = !showCursor
+                        }
+                    }
+                    Text(
+                        text = if (showCursor) "|" else " ",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Primary
+                    )
+                }
+            }
         }
     }
 }
