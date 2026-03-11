@@ -20,24 +20,47 @@ jobs:
           distribution: 'temurin'
           cache: 'gradle'
 
+      - name: Calculate next version
+        id: version
+        run: |
+          LATEST=$(gh release list --limit 1 --json tagName -q '.[0].tagName' 2>/dev/null || echo "")
+          if [ -z "$LATEST" ] || [ "$LATEST" = "null" ]; then
+            NEXT="1.0"
+          else
+            VER="${LATEST#v}"
+            MAJOR=$(echo "$VER" | cut -d. -f1)
+            MINOR=$(echo "$VER" | cut -d. -f2)
+            MINOR=$((MINOR + 1))
+            if [ "$MINOR" -gt 9 ]; then
+              MAJOR=$((MAJOR + 1))
+              MINOR=0
+            fi
+            NEXT="${MAJOR}.${MINOR}"
+          fi
+          echo "version=$NEXT" >> $GITHUB_OUTPUT
+          echo "Next version: $NEXT"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update version in build.gradle.kts
+        run: |
+          sed -i "s/versionName = \".*\"/versionName = \"${{ steps.version.outputs.version }}\"/" app/build.gradle.kts
+          sed -i "s/versionCode = [0-9]*/versionCode = $(date +%s | tail -c 9)/" app/build.gradle.kts
+
       - name: Grant execute permission for Gradlew
         run: chmod +x gradlew
 
       - name: Build APK
         run: ./gradlew :app:assembleDebug
 
-      - name: Get version name
-        id: version
-        run: |
-          VERSION=$(grep "versionName" app/build.gradle.kts | head -1 | grep -oP '"\K[^"]+')
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.version }}
-          name: v${{ steps.version.outputs.version }}
+          name: Pilot v${{ steps.version.outputs.version }}
           files: app/build/outputs/apk/debug/app-debug.apk
           make_latest: true
+          body: |
+            Version ${{ steps.version.outputs.version }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
