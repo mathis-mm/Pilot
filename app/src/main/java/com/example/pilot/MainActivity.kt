@@ -216,7 +216,9 @@ fun PilotApp() {
                     tasks = tasks,
                     onAddTask = { title, desc, priority -> taskViewModel.addTask(title, desc, priority) },
                     onToggleTask = { taskViewModel.toggleTask(it) },
-                    onDeleteTask = { taskViewModel.deleteTask(it) }
+                    onDeleteTask = { taskViewModel.deleteTask(it) },
+                    onUpdateTask = { taskViewModel.updateTask(it) },
+                    onDeleteCompleted = { taskViewModel.deleteCompletedTasks() }
                 )
             }
 
@@ -229,9 +231,11 @@ fun PilotApp() {
                     deviceEvents = deviceEvents,
                     onAddEvent = { title, desc, start, end -> eventViewModel.addEvent(title, desc, start, end) },
                     onDeleteEvent = { eventViewModel.deleteEvent(it) },
+                    onUpdateEvent = { eventViewModel.updateEvent(it) },
                     onDateSelected = { year, month, day ->
                         calendarViewModel.loadEventsForDate(year, month, day)
-                    }
+                    },
+                    onRefresh = { calendarViewModel.loadUpcomingEvents() }
                 )
             }
 
@@ -241,7 +245,8 @@ fun PilotApp() {
                     notes = notes,
                     onAddNote = { title, content, color -> noteViewModel.addNote(title, content, color) },
                     onTogglePin = { noteViewModel.togglePin(it) },
-                    onDeleteNote = { noteViewModel.deleteNote(it) }
+                    onDeleteNote = { noteViewModel.deleteNote(it) },
+                    onUpdateNote = { noteViewModel.updateNote(it) }
                 )
             }
 

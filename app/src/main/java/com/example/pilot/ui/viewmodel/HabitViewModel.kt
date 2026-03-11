@@ -1,34 +1,48 @@
 package com.example.pilot.ui.viewmodel
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
 import com.example.pilot.data.PilotRepository
 import com.example.pilot.data.model.Habit
 import com.example.pilot.data.model.HabitEntry
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import java.util.*
 
-class HabitViewModel : ViewModel() {
-    private val repo = PilotRepository
+class HabitViewModel(application: Application) : AndroidViewModel(application) {
+    private val repo = PilotRepository(application)
 
     val allHabits: StateFlow<List<Habit>> = repo.habits
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     val allEntries: StateFlow<List<HabitEntry>> = repo.habitEntries
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun addHabit(name: String, icon: String = "✅") {
-        repo.addHabit(Habit(name = name, icon = icon))
+        viewModelScope.launch {
+            repo.addHabit(Habit(name = name, icon = icon))
+        }
     }
 
     fun toggleHabitForToday(habit: Habit, entries: List<HabitEntry>) {
         val today = getTodayStart()
         val existing = entries.find { it.habitId == habit.id && it.date == today }
-        if (existing != null) {
-            repo.deleteHabitEntry(habit.id, today)
-        } else {
-            repo.addHabitEntry(HabitEntry(habitId = habit.id, date = today))
+        viewModelScope.launch {
+            if (existing != null) {
+                repo.deleteHabitEntry(habit.id, today)
+            } else {
+                repo.addHabitEntry(HabitEntry(habitId = habit.id, date = today))
+            }
         }
     }
 
     fun deleteHabit(habit: Habit) {
-        repo.deleteHabit(habit)
+        viewModelScope.launch {
+            repo.deleteHabit(habit)
+        }
     }
 
     companion object {

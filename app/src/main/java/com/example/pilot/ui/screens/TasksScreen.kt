@@ -3,6 +3,7 @@ package com.example.pilot.ui.screens
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -12,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,10 +35,14 @@ fun TasksScreen(
     tasks: List<Task>,
     onAddTask: (String, String, TaskPriority) -> Unit,
     onToggleTask: (Task) -> Unit,
-    onDeleteTask: (Task) -> Unit
+    onDeleteTask: (Task) -> Unit,
+    onUpdateTask: (Task) -> Unit = {},
+    onDeleteCompleted: () -> Unit = {},
+    onRefresh: () -> Unit = {}
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
     var showCompletedTasks by remember { mutableStateOf(true) }
+    var editingTask by remember { mutableStateOf<Task?>(null) }
 
     val activeTasks = tasks.filter { !it.isCompleted }
     val completedTasks = tasks.filter { it.isCompleted }
@@ -58,6 +64,16 @@ fun TasksScreen(
         label = "percent"
     )
 
+    // Pull to refresh
+    var isRefreshing by remember { mutableStateOf(false) }
+    LaunchedEffect(isRefreshing) {
+        if (isRefreshing) {
+            onRefresh()
+            delay(500)
+            isRefreshing = false
+        }
+    }
+
     Scaffold(
         floatingActionButton = {
             ExtendedFloatingActionButton(
@@ -70,129 +86,155 @@ fun TasksScreen(
             )
         }
     ) { padding ->
-        LazyColumn(
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { isRefreshing = true },
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
-                .padding(padding),
-            contentPadding = PaddingValues(bottom = 100.dp)
+                .padding(padding)
         ) {
-            // Header with fade in
-            item {
-                AnimatedVisibility(
-                    visible = visible,
-                    enter = fadeIn(tween(600)) + slideInVertically(tween(600)) { -40 }
-                ) {
-                    Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
-                        Text(
-                            text = "Mes Tâches",
-                            style = MaterialTheme.typography.headlineLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "${activeTasks.size} tâche(s) en cours",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                        )
-                    }
-                }
-            }
-
-            // Animated Progress Card
-            if (tasks.isNotEmpty()) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background),
+                contentPadding = PaddingValues(bottom = 100.dp)
+            ) {
+                // Header with fade in
                 item {
                     AnimatedVisibility(
                         visible = visible,
-                        enter = fadeIn(tween(500, delayMillis = 150)) + slideInVertically(tween(500, delayMillis = 150)) { 30 }
+                        enter = fadeIn(tween(600)) + slideInVertically(tween(600)) { -40 }
                     ) {
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 20.dp, vertical = 8.dp),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-                        ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(
-                                        "Progression",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                    Text(
-                                        "${animatedPercent}%",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(8.dp))
-                                LinearProgressIndicator(
-                                    progress = { animatedProgress },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(8.dp)
-                                        .clip(RoundedCornerShape(4.dp)),
-                                    color = MaterialTheme.colorScheme.primary,
-                                    trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Active Tasks
-            if (activeTasks.isEmpty() && completedTasks.isEmpty()) {
-                item {
-                    EmptyStateCard(
-                        icon = Icons.Outlined.TaskAlt,
-                        title = "Aucune tâche",
-                        subtitle = "Appuyez sur + pour créer votre première tâche"
-                    )
-                }
-            }
-
-            itemsIndexed(activeTasks, key = { _, task -> task.id }) { index, task ->
-                AnimatedVisibility(
-                    visible = visible,
-                    enter = fadeIn(tween(400, delayMillis = 200 + index * 60)) +
-                            slideInHorizontally(tween(400, delayMillis = 200 + index * 60)) { 80 }
-                ) {
-                    TaskItem(task = task, onToggle = { onToggleTask(task) }, onDelete = { onDeleteTask(task) })
-                }
-            }
-
-            // Completed section
-            if (completedTasks.isNotEmpty()) {
-                item {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            "Terminées (${completedTasks.size})",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                        )
-                        IconButton(onClick = { showCompletedTasks = !showCompletedTasks }) {
-                            Icon(
-                                if (showCompletedTasks) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                                contentDescription = null
+                        Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
+                            Text(
+                                text = "Mes Tâches",
+                                style = MaterialTheme.typography.headlineLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "${activeTasks.size} tâche(s) en cours",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                             )
                         }
                     }
                 }
-                if (showCompletedTasks) {
-                    items(completedTasks, key = { it.id }) { task ->
-                        TaskItem(task = task, onToggle = { onToggleTask(task) }, onDelete = { onDeleteTask(task) })
+
+                // Animated Progress Card
+                if (tasks.isNotEmpty()) {
+                    item {
+                        AnimatedVisibility(
+                            visible = visible,
+                            enter = fadeIn(tween(500, delayMillis = 150)) + slideInVertically(tween(500, delayMillis = 150)) { 30 }
+                        ) {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(
+                                            "Progression",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        Text(
+                                            "${animatedPercent}%",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    LinearProgressIndicator(
+                                        progress = { animatedProgress },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(8.dp)
+                                            .clip(RoundedCornerShape(4.dp)),
+                                        color = MaterialTheme.colorScheme.primary,
+                                        trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Active Tasks
+                if (activeTasks.isEmpty() && completedTasks.isEmpty()) {
+                    item {
+                        EmptyStateCard(
+                            icon = Icons.Outlined.TaskAlt,
+                            title = "Aucune tâche",
+                            subtitle = "Appuyez sur + pour créer votre première tâche"
+                        )
+                    }
+                }
+
+                itemsIndexed(activeTasks, key = { _, task -> task.id }) { index, task ->
+                    AnimatedVisibility(
+                        visible = visible,
+                        enter = fadeIn(tween(400, delayMillis = 200 + index * 60)) +
+                                slideInHorizontally(tween(400, delayMillis = 200 + index * 60)) { 80 }
+                    ) {
+                        TaskItem(
+                            task = task,
+                            onToggle = { onToggleTask(task) },
+                            onDelete = { onDeleteTask(task) },
+                            onEdit = { editingTask = task }
+                        )
+                    }
+                }
+
+                // Completed section
+                if (completedTasks.isNotEmpty()) {
+                    item {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 20.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "Terminées (${completedTasks.size})",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            )
+                            Row {
+                                IconButton(onClick = { onDeleteCompleted() }) {
+                                    Icon(
+                                        Icons.Outlined.DeleteSweep,
+                                        contentDescription = "Supprimer terminées",
+                                        tint = Error.copy(alpha = 0.6f)
+                                    )
+                                }
+                                IconButton(onClick = { showCompletedTasks = !showCompletedTasks }) {
+                                    Icon(
+                                        if (showCompletedTasks) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                                        contentDescription = null
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    if (showCompletedTasks) {
+                        items(completedTasks, key = { it.id }) { task ->
+                            TaskItem(
+                                task = task,
+                                onToggle = { onToggleTask(task) },
+                                onDelete = { onDeleteTask(task) },
+                                onEdit = { editingTask = task }
+                            )
+                        }
                     }
                 }
             }
@@ -208,10 +250,21 @@ fun TasksScreen(
             }
         )
     }
+
+    editingTask?.let { task ->
+        EditTaskDialog(
+            task = task,
+            onDismiss = { editingTask = null },
+            onConfirm = { updated ->
+                onUpdateTask(updated)
+                editingTask = null
+            }
+        )
+    }
 }
 
 @Composable
-fun TaskItem(task: Task, onToggle: () -> Unit, onDelete: () -> Unit) {
+fun TaskItem(task: Task, onToggle: () -> Unit, onDelete: () -> Unit, onEdit: () -> Unit = {}) {
     val priorityColor = when (task.priority) {
         TaskPriority.HIGH -> PriorityHigh
         TaskPriority.MEDIUM -> PriorityMedium
@@ -235,7 +288,8 @@ fun TaskItem(task: Task, onToggle: () -> Unit, onDelete: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp, vertical = 4.dp)
-            .animateContentSize(spring(dampingRatio = 0.8f)),
+            .animateContentSize(spring(dampingRatio = 0.8f))
+            .clickable { onEdit() },
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (task.isCompleted)
@@ -321,6 +375,81 @@ fun TaskItem(task: Task, onToggle: () -> Unit, onDelete: () -> Unit) {
             }
         )
     }
+}
+
+@Composable
+fun EditTaskDialog(
+    task: Task,
+    onDismiss: () -> Unit,
+    onConfirm: (Task) -> Unit
+) {
+    var title by remember { mutableStateOf(task.title) }
+    var description by remember { mutableStateOf(task.description) }
+    var priority by remember { mutableStateOf(task.priority) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Modifier la tâche", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Titre") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("Description") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    maxLines = 3
+                )
+                Text("Priorité", style = MaterialTheme.typography.labelLarge)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TaskPriority.entries.forEach { p ->
+                        val color = when (p) {
+                            TaskPriority.HIGH -> PriorityHigh
+                            TaskPriority.MEDIUM -> PriorityMedium
+                            TaskPriority.LOW -> PriorityLow
+                        }
+                        val label = when (p) {
+                            TaskPriority.HIGH -> "Haute"
+                            TaskPriority.MEDIUM -> "Moy."
+                            TaskPriority.LOW -> "Basse"
+                        }
+                        FilterChip(
+                            selected = priority == p,
+                            onClick = { priority = p },
+                            label = { Text(label) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = color.copy(alpha = 0.2f),
+                                selectedLabelColor = color
+                            )
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (title.isNotBlank()) {
+                        onConfirm(task.copy(title = title, description = description, priority = priority))
+                    }
+                },
+                enabled = title.isNotBlank(),
+                shape = RoundedCornerShape(12.dp)
+            ) { Text("Enregistrer") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Annuler") }
+        },
+        shape = RoundedCornerShape(24.dp)
+    )
 }
 
 @Composable

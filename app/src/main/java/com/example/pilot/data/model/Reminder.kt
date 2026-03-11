@@ -1,5 +1,8 @@
 package com.example.pilot.data.model
 
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+
 enum class ReminderType { TASK, EVENT }
 
 enum class ReminderOffset(val minutes: Int, val label: String) {
@@ -11,8 +14,9 @@ enum class ReminderOffset(val minutes: Int, val label: String) {
     ONE_DAY(1440, "1 jour avant")
 }
 
+@Entity(tableName = "reminders")
 data class Reminder(
-    val id: Long = 0,
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val type: ReminderType,
     val referenceId: Long,
     val title: String,

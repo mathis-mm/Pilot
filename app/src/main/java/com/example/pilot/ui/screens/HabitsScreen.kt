@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,7 +43,8 @@ fun HabitsScreen(
     weekEntries: List<HabitEntry>,
     onAddHabit: (String, String) -> Unit,
     onToggleHabit: (Habit, List<HabitEntry>) -> Unit,
-    onDeleteHabit: (Habit) -> Unit
+    onDeleteHabit: (Habit) -> Unit,
+    onRefresh: () -> Unit = {}
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
     val todayStart = HabitViewModel.getTodayStart()
@@ -50,6 +52,16 @@ fun HabitsScreen(
     // Entrance animation
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { visible = true }
+
+    // Pull to refresh
+    var isRefreshing by remember { mutableStateOf(false) }
+    LaunchedEffect(isRefreshing) {
+        if (isRefreshing) {
+            onRefresh()
+            delay(500)
+            isRefreshing = false
+        }
+    }
 
     // Generate week days
     val weekDays = remember {
@@ -80,11 +92,17 @@ fun HabitsScreen(
             )
         }
     ) { padding ->
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { isRefreshing = true },
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+        ) {
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
-                .padding(padding),
+                .background(MaterialTheme.colorScheme.background),
             contentPadding = PaddingValues(bottom = 100.dp)
         ) {
             // Header
@@ -216,6 +234,7 @@ fun HabitsScreen(
                     )
                 }
             }
+        }
         }
     }
 

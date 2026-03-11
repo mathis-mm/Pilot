@@ -3,6 +3,8 @@ package com.example.pilot.ui.screens
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
@@ -12,9 +14,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
@@ -32,13 +36,26 @@ fun NotesScreen(
     notes: List<Note>,
     onAddNote: (String, String, Int) -> Unit,
     onTogglePin: (Note) -> Unit,
-    onDeleteNote: (Note) -> Unit
+    onDeleteNote: (Note) -> Unit,
+    onUpdateNote: (Note) -> Unit = {},
+    onRefresh: () -> Unit = {}
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
+    var editingNote by remember { mutableStateOf<Note?>(null) }
 
     // Entrance animation
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { visible = true }
+
+    // Pull to refresh
+    var isRefreshing by remember { mutableStateOf(false) }
+    LaunchedEffect(isRefreshing) {
+        if (isRefreshing) {
+            onRefresh()
+            delay(500)
+            isRefreshing = false
+        }
+    }
 
     Scaffold(
         floatingActionButton = {
@@ -52,12 +69,18 @@ fun NotesScreen(
             )
         }
     ) { padding ->
-        Column(
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { isRefreshing = true },
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
                 .padding(padding)
         ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background)
+            ) {
             // Header
             AnimatedVisibility(
                 visible = visible,
@@ -116,11 +139,13 @@ fun NotesScreen(
                         NoteCard(
                             note = note,
                             onTogglePin = { onTogglePin(note) },
-                            onDelete = { onDeleteNote(note) }
+                            onDelete = { onDeleteNote(note) },
+                            onEdit = { editingNote = note }
                         )
                     }
                 }
             }
+        }
         }
     }
 
@@ -133,11 +158,22 @@ fun NotesScreen(
             }
         )
     }
+
+    editingNote?.let { note ->
+        EditNoteDialog(
+            note = note,
+            onDismiss = { editingNote = null },
+            onConfirm = { updated ->
+                onUpdateNote(updated)
+                editingNote = null
+            }
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NoteCard(note: Note, onTogglePin: () -> Unit, onDelete: () -> Unit) {
+fun NoteCard(note: Note, onTogglePin: () -> Unit, onDelete: () -> Unit, onEdit: () -> Unit = {}) {
     var showDeleteConfirm by remember { mutableStateOf(false) }
     val dateFormat = SimpleDateFormat("dd/MM/yy HH:mm", Locale.FRANCE)
 
@@ -156,6 +192,7 @@ fun NoteCard(note: Note, onTogglePin: () -> Unit, onDelete: () -> Unit) {
     )
 
     Card(
+        onClick = onEdit,
         modifier = Modifier
             .fillMaxWidth()
             .graphicsLayer {
@@ -325,6 +362,83 @@ fun AddNoteDialog(
                 enabled = title.isNotBlank(),
                 shape = RoundedCornerShape(12.dp)
             ) { Text("Créer") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Annuler") }
+        },
+        shape = RoundedCornerShape(24.dp)
+    )
+}
+
+@Composable
+fun EditNoteDialog(
+    note: Note,
+    onDismiss: () -> Unit,
+    onConfirm: (Note) -> Unit
+) {
+    var title by remember { mutableStateOf(note.title) }
+    var content by remember { mutableStateOf(note.content) }
+
+    val noteColors = listOf(NoteYellow, NoteGreen, NoteBlue, NotePink, NoteOrange, NotePurple)
+    var selectedColorIndex by remember {
+        mutableIntStateOf(noteColors.indexOfFirst { it.value.toInt() == note.color }.coerceAtLeast(0))
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Modifier la note", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Titre") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = content,
+                    onValueChange = { content = it },
+                    label = { Text("Contenu") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    maxLines = 5
+                )
+                Text("Couleur", style = MaterialTheme.typography.labelLarge)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    noteColors.forEachIndexed { index, color ->
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(color)
+                                .clickable { selectedColorIndex = index }
+                                .then(
+                                    if (selectedColorIndex == index)
+                                        Modifier.border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp))
+                                    else Modifier
+                                )
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (title.isNotBlank()) {
+                        onConfirm(note.copy(
+                            title = title,
+                            content = content,
+                            color = noteColors[selectedColorIndex].value.toInt(),
+                            updatedAt = System.currentTimeMillis()
+                        ))
+                    }
+                },
+                enabled = title.isNotBlank(),
+                shape = RoundedCornerShape(12.dp)
+            ) { Text("Enregistrer") }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Annuler") }

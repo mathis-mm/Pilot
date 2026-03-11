@@ -1,7 +1,11 @@
 package com.example.pilot.data.model
 
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+
+@Entity(tableName = "events")
 data class Event(
-    val id: Long = 0,
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val title: String,
     val description: String = "",
     val startTime: Long,

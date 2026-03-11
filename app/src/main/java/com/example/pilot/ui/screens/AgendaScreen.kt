@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,10 +39,13 @@ fun AgendaScreen(
     deviceEvents: List<DeviceCalendarEvent> = emptyList(),
     onAddEvent: (String, String, Long, Long) -> Unit,
     onDeleteEvent: (Event) -> Unit,
-    onDateSelected: (Int, Int, Int) -> Unit = { _, _, _ -> }
+    onUpdateEvent: (Event) -> Unit = {},
+    onDateSelected: (Int, Int, Int) -> Unit = { _, _, _ -> },
+    onRefresh: () -> Unit = {}
 ) {
     var selectedDate by remember { mutableStateOf(Calendar.getInstance()) }
     var showAddDialog by remember { mutableStateOf(false) }
+    var editingEvent by remember { mutableStateOf<Event?>(null) }
 
     // Entrance animation
     var visible by remember { mutableStateOf(false) }
@@ -89,6 +93,21 @@ fun AgendaScreen(
     val allDayEvents = dayEvents + deviceEvents.map { null } // just for count display
     val totalCount = dayEvents.size + deviceEvents.size
 
+    // Pull to refresh
+    var isRefreshing by remember { mutableStateOf(false) }
+    LaunchedEffect(isRefreshing) {
+        if (isRefreshing) {
+            onRefresh()
+            onDateSelected(
+                selectedDate.get(Calendar.YEAR),
+                selectedDate.get(Calendar.MONTH),
+                selectedDate.get(Calendar.DAY_OF_MONTH)
+            )
+            delay(500)
+            isRefreshing = false
+        }
+    }
+
     Scaffold(
         floatingActionButton = {
             ExtendedFloatingActionButton(
@@ -101,13 +120,19 @@ fun AgendaScreen(
             )
         }
     ) { padding ->
-        LazyColumn(
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { isRefreshing = true },
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black)
-                .padding(padding),
-            contentPadding = PaddingValues(bottom = 100.dp)
+                .padding(padding)
         ) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black),
+                contentPadding = PaddingValues(bottom = 100.dp)
+            ) {
             // Header with month + arrows
             item {
                 AnimatedVisibility(
@@ -278,7 +303,8 @@ fun AgendaScreen(
                     EventItem(
                         event = event,
                         timeFormat = timeFormat,
-                        onDelete = { onDeleteEvent(event) }
+                        onDelete = { onDeleteEvent(event) },
+                        onEdit = { editingEvent = event }
                     )
                 }
             }
@@ -320,6 +346,7 @@ fun AgendaScreen(
                 }
             }
         }
+        }
     }
 
     if (showAddDialog) {
@@ -329,6 +356,18 @@ fun AgendaScreen(
             onConfirm = { title, desc, start, end ->
                 onAddEvent(title, desc, start, end)
                 showAddDialog = false
+            }
+        )
+    }
+
+    editingEvent?.let { event ->
+        EditEventDialog(
+            event = event,
+            selectedDate = selectedDate,
+            onDismiss = { editingEvent = null },
+            onConfirm = { updated ->
+                onUpdateEvent(updated)
+                editingEvent = null
             }
         )
     }
@@ -381,14 +420,15 @@ fun DayChip(
 }
 
 @Composable
-fun EventItem(event: Event, timeFormat: SimpleDateFormat, onDelete: () -> Unit) {
+fun EventItem(event: Event, timeFormat: SimpleDateFormat, onDelete: () -> Unit, onEdit: () -> Unit = {}) {
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 3.dp)
-            .animateContentSize(spring(dampingRatio = 0.8f)),
+            .animateContentSize(spring(dampingRatio = 0.8f))
+            .clickable { onEdit() },
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF111111))
     ) {
@@ -635,4 +675,107 @@ fun DeviceCalendarEventItem(
             }
         }
     }
+}
+
+@Composable
+fun EditEventDialog(
+    event: Event,
+    selectedDate: Calendar,
+    onDismiss: () -> Unit,
+    onConfirm: (Event) -> Unit
+) {
+    val startCal = Calendar.getInstance().apply { timeInMillis = event.startTime }
+    val endCal = Calendar.getInstance().apply { timeInMillis = event.endTime }
+
+    var title by remember { mutableStateOf(event.title) }
+    var description by remember { mutableStateOf(event.description) }
+    var startHour by remember { mutableStateOf(String.format("%02d", startCal.get(Calendar.HOUR_OF_DAY))) }
+    var startMinute by remember { mutableStateOf(String.format("%02d", startCal.get(Calendar.MINUTE))) }
+    var endHour by remember { mutableStateOf(String.format("%02d", endCal.get(Calendar.HOUR_OF_DAY))) }
+    var endMinute by remember { mutableStateOf(String.format("%02d", endCal.get(Calendar.MINUTE))) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Modifier l'evenement", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Titre") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("Description") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                Text("Debut", style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.5f))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = startHour,
+                        onValueChange = { if (it.length <= 2 && it.all { c -> c.isDigit() }) startHour = it },
+                        label = { Text("Heure") },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = startMinute,
+                        onValueChange = { if (it.length <= 2 && it.all { c -> c.isDigit() }) startMinute = it },
+                        label = { Text("Min") },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true
+                    )
+                }
+                Text("Fin", style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.5f))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = endHour,
+                        onValueChange = { if (it.length <= 2 && it.all { c -> c.isDigit() }) endHour = it },
+                        label = { Text("Heure") },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = endMinute,
+                        onValueChange = { if (it.length <= 2 && it.all { c -> c.isDigit() }) endMinute = it },
+                        label = { Text("Min") },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (title.isNotBlank()) {
+                        val cal = selectedDate.clone() as Calendar
+                        cal.set(Calendar.HOUR_OF_DAY, startHour.toIntOrNull() ?: 0)
+                        cal.set(Calendar.MINUTE, startMinute.toIntOrNull() ?: 0)
+                        cal.set(Calendar.SECOND, 0)
+                        val start = cal.timeInMillis
+                        cal.set(Calendar.HOUR_OF_DAY, endHour.toIntOrNull() ?: 0)
+                        cal.set(Calendar.MINUTE, endMinute.toIntOrNull() ?: 0)
+                        val end = cal.timeInMillis
+                        onConfirm(event.copy(title = title, description = description, startTime = start, endTime = end))
+                    }
+                },
+                enabled = title.isNotBlank(),
+                shape = RoundedCornerShape(12.dp)
+            ) { Text("Enregistrer") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Annuler") }
+        },
+        shape = RoundedCornerShape(24.dp)
+    )
 }
