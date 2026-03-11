@@ -1,5 +1,6 @@
 package com.example.pilot.update
 
+import android.app.Activity
 import android.app.DownloadManager
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -8,8 +9,11 @@ import android.content.IntentFilter
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
+import android.os.Handler
+import android.os.Looper
 import androidx.core.content.FileProvider
 import java.io.File
+import kotlin.system.exitProcess
 
 object UpdateManager {
 
@@ -68,5 +72,13 @@ object UpdateManager {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         context.startActivity(intent)
+
+        // Close the app so the installer can replace the APK
+        Handler(Looper.getMainLooper()).postDelayed({
+            if (context is Activity) {
+                context.finishAffinity()
+            }
+            exitProcess(0)
+        }, 800)
     }
 }

@@ -57,12 +57,12 @@ class MainActivity : ComponentActivity() {
 
         NotificationHelper.createNotificationChannels(this)
 
-        // Schedule background update checks every 6 hours
-        val updateWork = PeriodicWorkRequestBuilder<UpdateWorker>(6, TimeUnit.HOURS)
+        // Schedule background update checks every 1 hour
+        val updateWork = PeriodicWorkRequestBuilder<UpdateWorker>(1, TimeUnit.HOURS)
             .build()
         WorkManager.getInstance(this).enqueueUniquePeriodicWork(
             "update_check",
-            ExistingPeriodicWorkPolicy.KEEP,
+            ExistingPeriodicWorkPolicy.UPDATE,
             updateWork
         )
 
