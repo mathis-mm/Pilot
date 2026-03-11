@@ -1,5 +1,7 @@
 package com.example.pilot.ui.screens
 
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -7,6 +9,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -17,7 +20,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -26,6 +31,7 @@ import com.example.pilot.data.model.Habit
 import com.example.pilot.data.model.HabitEntry
 import com.example.pilot.ui.theme.*
 import com.example.pilot.ui.viewmodel.HabitViewModel
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -40,6 +46,10 @@ fun HabitsScreen(
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
     val todayStart = HabitViewModel.getTodayStart()
+
+    // Entrance animation
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { visible = true }
 
     // Generate week days
     val weekDays = remember {
@@ -79,23 +89,32 @@ fun HabitsScreen(
         ) {
             // Header
             item {
-                Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
-                    Text(
-                        text = "Habitudes",
-                        style = MaterialTheme.typography.headlineLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "Suivez vos routines quotidiennes",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                    )
+                AnimatedVisibility(
+                    visible = visible,
+                    enter = fadeIn(tween(600)) + slideInVertically(tween(600)) { -40 }
+                ) {
+                    Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
+                        Text(
+                            text = "Habitudes",
+                            style = MaterialTheme.typography.headlineLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Suivez vos routines quotidiennes",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                    }
                 }
             }
 
             // Weekly overview
             if (habits.isNotEmpty()) {
                 item {
+                    AnimatedVisibility(
+                        visible = visible,
+                        enter = fadeIn(tween(500, delayMillis = 150)) + slideInVertically(tween(500, delayMillis = 150)) { 30 }
+                    ) {
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -165,6 +184,7 @@ fun HabitsScreen(
                         }
                     }
                     Spacer(modifier = Modifier.height(8.dp))
+                    }
                 }
             }
 
@@ -179,16 +199,22 @@ fun HabitsScreen(
             }
 
             // Habits list
-            items(habits, key = { it.id }) { habit ->
+            itemsIndexed(habits, key = { _, h -> h.id }) { index, habit ->
                 val isCompletedToday = weekEntries.any { it.habitId == habit.id && it.date == todayStart }
-                HabitItem(
-                    habit = habit,
-                    isCompletedToday = isCompletedToday,
-                    weekEntries = weekEntries.filter { it.habitId == habit.id },
-                    weekDays = weekDays,
-                    onToggle = { onToggleHabit(habit, weekEntries) },
-                    onDelete = { onDeleteHabit(habit) }
-                )
+                AnimatedVisibility(
+                    visible = visible,
+                    enter = fadeIn(tween(400, delayMillis = 250 + index * 70)) +
+                            slideInHorizontally(tween(400, delayMillis = 250 + index * 70)) { 80 }
+                ) {
+                    HabitItem(
+                        habit = habit,
+                        isCompletedToday = isCompletedToday,
+                        weekEntries = weekEntries.filter { it.habitId == habit.id },
+                        weekDays = weekDays,
+                        onToggle = { onToggleHabit(habit, weekEntries) },
+                        onDelete = { onDeleteHabit(habit) }
+                    )
+                }
             }
         }
     }
@@ -215,10 +241,17 @@ fun HabitItem(
 ) {
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
+    val toggleScale by animateFloatAsState(
+        targetValue = if (isCompletedToday) 1.1f else 1f,
+        animationSpec = spring(dampingRatio = 0.4f, stiffness = 500f),
+        label = "toggleScale"
+    )
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 4.dp),
+            .padding(horizontal = 20.dp, vertical = 4.dp)
+            .animateContentSize(spring(dampingRatio = 0.8f)),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
@@ -246,7 +279,7 @@ fun HabitItem(
                     colors = IconButtonDefaults.filledIconButtonColors(
                         containerColor = if (isCompletedToday) Success else MaterialTheme.colorScheme.surfaceVariant
                     ),
-                    modifier = Modifier.size(40.dp)
+                    modifier = Modifier.size(40.dp).scale(toggleScale)
                 ) {
                     Icon(
                         if (isCompletedToday) Icons.Filled.Check else Icons.Outlined.RadioButtonUnchecked,

@@ -1,11 +1,14 @@
 package com.example.pilot.ui.screens
 
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -17,12 +20,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.pilot.data.model.Event
 import com.example.pilot.data.model.DeviceCalendarEvent
 import com.example.pilot.ui.theme.*
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -37,6 +42,10 @@ fun AgendaScreen(
 ) {
     var selectedDate by remember { mutableStateOf(Calendar.getInstance()) }
     var showAddDialog by remember { mutableStateOf(false) }
+
+    // Entrance animation
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { visible = true }
 
     val dayFormat = SimpleDateFormat("d", Locale.FRANCE)
     val dayNameFormat = SimpleDateFormat("EEE", Locale.FRANCE)
@@ -101,7 +110,11 @@ fun AgendaScreen(
         ) {
             // Header with month + arrows
             item {
-                Row(
+                AnimatedVisibility(
+                    visible = visible,
+                    enter = fadeIn(tween(600)) + slideInVertically(tween(600)) { -40 }
+                ) {
+                    Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp)
@@ -149,6 +162,7 @@ fun AgendaScreen(
                             tint = Color.White
                         )
                     }
+                }
                 }
             }
 
@@ -256,11 +270,17 @@ fun AgendaScreen(
             }
 
             items(dayEvents, key = { it.id }) { event ->
-                EventItem(
-                    event = event,
-                    timeFormat = timeFormat,
-                    onDelete = { onDeleteEvent(event) }
-                )
+                AnimatedVisibility(
+                    visible = visible,
+                    enter = fadeIn(tween(400, delayMillis = 200)) +
+                            slideInHorizontally(tween(400, delayMillis = 200)) { 80 }
+                ) {
+                    EventItem(
+                        event = event,
+                        timeFormat = timeFormat,
+                        onDelete = { onDeleteEvent(event) }
+                    )
+                }
             }
 
             // Device calendar events
@@ -286,11 +306,17 @@ fun AgendaScreen(
                         )
                     }
                 }
-                items(deviceEvents, key = { "device_${it.id}" }) { deviceEvent ->
-                    DeviceCalendarEventItem(
-                        event = deviceEvent,
-                        timeFormat = timeFormat
-                    )
+                itemsIndexed(deviceEvents, key = { _, e -> "device_${e.id}" }) { index, deviceEvent ->
+                    AnimatedVisibility(
+                        visible = visible,
+                        enter = fadeIn(tween(400, delayMillis = 300 + index * 60)) +
+                                slideInHorizontally(tween(400, delayMillis = 300 + index * 60)) { 80 }
+                    ) {
+                        DeviceCalendarEventItem(
+                            event = deviceEvent,
+                            timeFormat = timeFormat
+                        )
+                    }
                 }
             }
         }
@@ -361,7 +387,8 @@ fun EventItem(event: Event, timeFormat: SimpleDateFormat, onDelete: () -> Unit) 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 3.dp),
+            .padding(horizontal = 16.dp, vertical = 3.dp)
+            .animateContentSize(spring(dampingRatio = 0.8f)),
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF111111))
     ) {

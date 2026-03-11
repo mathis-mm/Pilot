@@ -1,10 +1,12 @@
 package com.example.pilot.ui.screens
 
 import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -14,13 +16,16 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.example.pilot.data.model.Task
 import com.example.pilot.data.model.TaskPriority
 import com.example.pilot.ui.theme.*
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -35,6 +40,23 @@ fun TasksScreen(
 
     val activeTasks = tasks.filter { !it.isCompleted }
     val completedTasks = tasks.filter { it.isCompleted }
+
+    // Entrance animation
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { visible = true }
+
+    // Animated progress
+    val progress = if (tasks.isNotEmpty()) completedTasks.size.toFloat() / tasks.size else 0f
+    val animatedProgress by animateFloatAsState(
+        targetValue = if (visible) progress else 0f,
+        animationSpec = tween(1000, easing = FastOutSlowInEasing),
+        label = "progress"
+    )
+    val animatedPercent by animateIntAsState(
+        targetValue = if (visible) (progress * 100).toInt() else 0,
+        animationSpec = tween(800, easing = FastOutSlowInEasing),
+        label = "percent"
+    )
 
     Scaffold(
         floatingActionButton = {
@@ -55,60 +77,69 @@ fun TasksScreen(
                 .padding(padding),
             contentPadding = PaddingValues(bottom = 100.dp)
         ) {
-            // Header
+            // Header with fade in
             item {
-                Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
-                    Text(
-                        text = "Mes Tâches",
-                        style = MaterialTheme.typography.headlineLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "${activeTasks.size} tâche(s) en cours",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                    )
+                AnimatedVisibility(
+                    visible = visible,
+                    enter = fadeIn(tween(600)) + slideInVertically(tween(600)) { -40 }
+                ) {
+                    Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
+                        Text(
+                            text = "Mes Tâches",
+                            style = MaterialTheme.typography.headlineLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "${activeTasks.size} tâche(s) en cours",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                    }
                 }
             }
 
-            // Progress
+            // Animated Progress Card
             if (tasks.isNotEmpty()) {
                 item {
-                    val progress = completedTasks.size.toFloat() / tasks.size
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 8.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                    AnimatedVisibility(
+                        visible = visible,
+                        enter = fadeIn(tween(500, delayMillis = 150)) + slideInVertically(tween(500, delayMillis = 150)) { 30 }
                     ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    "Progression",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Text(
-                                    "${(progress * 100).toInt()}%",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 20.dp, vertical = 8.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        "Progression",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Text(
+                                        "${animatedPercent}%",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                                LinearProgressIndicator(
+                                    progress = { animatedProgress },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(8.dp)
+                                        .clip(RoundedCornerShape(4.dp)),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
                                 )
                             }
-                            Spacer(modifier = Modifier.height(8.dp))
-                            LinearProgressIndicator(
-                                progress = { progress },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(8.dp)
-                                    .clip(RoundedCornerShape(4.dp)),
-                                color = MaterialTheme.colorScheme.primary,
-                                trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                            )
                         }
                     }
                 }
@@ -125,8 +156,14 @@ fun TasksScreen(
                 }
             }
 
-            items(activeTasks, key = { it.id }) { task ->
-                TaskItem(task = task, onToggle = { onToggleTask(task) }, onDelete = { onDeleteTask(task) })
+            itemsIndexed(activeTasks, key = { _, task -> task.id }) { index, task ->
+                AnimatedVisibility(
+                    visible = visible,
+                    enter = fadeIn(tween(400, delayMillis = 200 + index * 60)) +
+                            slideInHorizontally(tween(400, delayMillis = 200 + index * 60)) { 80 }
+                ) {
+                    TaskItem(task = task, onToggle = { onToggleTask(task) }, onDelete = { onDeleteTask(task) })
+                }
             }
 
             // Completed section
@@ -188,11 +225,17 @@ fun TaskItem(task: Task, onToggle: () -> Unit, onDelete: () -> Unit) {
 
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
+    val checkScale by animateFloatAsState(
+        targetValue = if (task.isCompleted) 1.15f else 1f,
+        animationSpec = spring(dampingRatio = 0.4f, stiffness = 500f),
+        label = "checkScale"
+    )
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp, vertical = 4.dp)
-            .animateContentSize(),
+            .animateContentSize(spring(dampingRatio = 0.8f)),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (task.isCompleted)
@@ -255,7 +298,8 @@ fun TaskItem(task: Task, onToggle: () -> Unit, onDelete: () -> Unit) {
             Checkbox(
                 checked = task.isCompleted,
                 onCheckedChange = { onToggle() },
-                colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary)
+                colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary),
+                modifier = Modifier.scale(checkScale)
             )
         }
     }

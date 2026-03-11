@@ -1,5 +1,7 @@
 package com.example.pilot.ui.screens
 
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
@@ -14,11 +16,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.pilot.data.model.Note
 import com.example.pilot.ui.theme.*
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -31,6 +35,10 @@ fun NotesScreen(
     onDeleteNote: (Note) -> Unit
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
+
+    // Entrance animation
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { visible = true }
 
     Scaffold(
         floatingActionButton = {
@@ -51,17 +59,22 @@ fun NotesScreen(
                 .padding(padding)
         ) {
             // Header
-            Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
-                Text(
-                    text = "Notes",
-                    style = MaterialTheme.typography.headlineLarge,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "${notes.size} note(s)",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                )
+            AnimatedVisibility(
+                visible = visible,
+                enter = fadeIn(tween(600)) + slideInVertically(tween(600)) { -40 }
+            ) {
+                Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
+                    Text(
+                        text = "Notes",
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "${notes.size} note(s)",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                }
             }
 
             if (notes.isEmpty()) {
@@ -128,8 +141,29 @@ fun NoteCard(note: Note, onTogglePin: () -> Unit, onDelete: () -> Unit) {
     var showDeleteConfirm by remember { mutableStateOf(false) }
     val dateFormat = SimpleDateFormat("dd/MM/yy HH:mm", Locale.FRANCE)
 
+    // Entrance scale animation
+    var appeared by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { appeared = true }
+    val scale by animateFloatAsState(
+        targetValue = if (appeared) 1f else 0.8f,
+        animationSpec = spring(dampingRatio = 0.6f, stiffness = 300f),
+        label = "noteScale"
+    )
+    val alpha by animateFloatAsState(
+        targetValue = if (appeared) 1f else 0f,
+        animationSpec = tween(400),
+        label = "noteAlpha"
+    )
+
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                this.alpha = alpha
+            }
+            .animateContentSize(spring(dampingRatio = 0.8f)),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color(note.color))
     ) {
